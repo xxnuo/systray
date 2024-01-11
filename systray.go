@@ -17,6 +17,9 @@ var (
 
 	systrayReady  func()
 	systrayExit   func()
+	systrayLClick func(showMenu func() error)
+	systrayRClick func(showMenu func() error)
+
 	menuItems     = make(map[uint32]*MenuItem)
 	menuItemsLock sync.RWMutex
 
@@ -71,10 +74,10 @@ func newMenuItem(title string, tooltip string, parent *MenuItem) *MenuItem {
 	}
 }
 
-// Run initializes GUI and starts the event loop, then invokes the onReady callback. It blocks until
-// systray.Quit() is called. It must be run from the main thread on macOS.
-func Run(onReady func(), onExit func()) {
-	Register(onReady, onExit)
+// Run initializes GUI and starts the event loop, then invokes the onReady
+// callback. It blocks until systray.Quit() is called.
+func Run(onReady func(), onExit func(), onLClick func(showMenu func() error), onRClick func(showMenu func() error)) {
+	Register(onReady, onExit, onLClick, onRClick)
 	nativeLoop()
 }
 
@@ -83,7 +86,7 @@ func Run(onReady func(), onExit func()) {
 // needs to show other UI elements, for example, webview.
 // To overcome some OS weirdness, On macOS versions before Catalina, calling
 // this does exactly the same as Run().
-func Register(onReady func(), onExit func()) {
+func Register(onReady func(), onExit func(), onLClick func(showMenu func() error), onRClick func(showMenu func() error)) { // NOTE: 左键点击托盘图标
 	if onReady == nil {
 		systrayReady = func() {}
 	} else {
@@ -103,10 +106,21 @@ func Register(onReady func(), onExit func()) {
 		onExit = func() {}
 	}
 	systrayExit = onExit
+
+	if onLClick == nil {
+		onLClick = func(showMenu func() error) {showMenu()}
+	}
+	systrayLClick = onLClick
+
+	if onRClick == nil {
+		onRClick = func(showMenu func() error ) {showMenu()}
+	}
+	systrayRClick = onRClick
+
 	registerSystray()
 }
 
-// Quit the systray. This can be called from any goroutine.
+// Quit the systray
 func Quit() {
 	quitOnce.Do(quit)
 }
